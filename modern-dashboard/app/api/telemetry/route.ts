@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic'; // Prevent Vercel from caching this route statically
+
 // Simulating the structural payload expected from Architecture_API_Spec.md
 export async function GET() {
   // Generate slightly fluctuating mock data to simulate live sensors
   const baseMoisture = 65.0;
   const baseTemp = 32.5;
   const baseHumid = 45.0;
-  
+
   const randomVariance = () => (Math.random() * 2) - 1;
 
   const payload = {
