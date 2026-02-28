@@ -49,12 +49,17 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!history || history.length === 0) {
+  if (!history || !Array.isArray(history) || history.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white font-sans">
-        <div className="animate-pulse flex flex-col items-center">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white font-sans text-center">
+        <div className="animate-pulse flex flex-col items-center max-w-md">
           <BrainCircuit className="w-12 h-12 text-blue-500 mb-4 animate-bounce" />
           <h2 className="text-xl font-semibold">Initializing Cyber-Physical Link...</h2>
+          {history && !Array.isArray(history) && (
+            <p className="text-red-400 mt-4 text-sm font-mono border border-red-500/30 bg-red-500/10 p-4 rounded-lg">
+              Database Connection Error: Waiting for Render MONGODB_URI Environment Variable to finish deploying...
+            </p>
+          )}
         </div>
       </div>
     );
