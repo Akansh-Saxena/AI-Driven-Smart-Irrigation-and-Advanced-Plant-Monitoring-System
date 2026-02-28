@@ -77,6 +77,19 @@ async function runLoop() {
         web3_ledger: {
             water_saved_liters: parseFloat(waterSavedLiters.toFixed(2)),
             wct_tokens_minted: totalWctTokensMinted
+        },
+        edge_security: {
+            isolation_forest_anomaly: Math.random() > 0.98, // 2% chance of a security spoofing anomaly
+            inference_time_ms: 12.4 + randomVariance(2.0)
+        },
+        anti_gravity: {
+            magnetic_field_ut: 45000 + randomVariance(500), // Earth is ~45k, neodymium levitation adds variance
+            ultrasonic_array_active: false,
+            clinostat_rpm: 15.5 + randomVariance(0.2)
+        },
+        crop_yield: {
+            projected_yield_tha: 14.1 + (waterSavedLiters / 250), // Standard 14 t/ha scaling up towards 20 t/ha over time
+            yield_increase_pct: ((waterSavedLiters / 250) / 14.1) * 100
         }
     };
 

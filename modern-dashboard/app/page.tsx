@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/MetricCard";
 import { HistoricalChart } from "@/components/HistoricalChart";
-import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine } from "lucide-react";
+import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine, ShieldAlert, Magnet, Speaker, Sprout } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface TelemetryData {
@@ -37,6 +37,19 @@ interface TelemetryData {
   web3_ledger?: {
     water_saved_liters: number;
     wct_tokens_minted: number;
+  };
+  edge_security?: {
+    isolation_forest_anomaly: boolean;
+    inference_time_ms: number;
+  };
+  anti_gravity?: {
+    magnetic_field_ut: number;
+    ultrasonic_array_active: boolean;
+    clinostat_rpm: number;
+  };
+  crop_yield?: {
+    projected_yield_tha: number;
+    yield_increase_pct: number;
   };
 }
 
@@ -227,6 +240,68 @@ export default function Home() {
 
         </div>
 
+        {/* --- PHASE 4 INTEGRATION ROW --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+
+          {/* Edge AI Security (Isolation Forest) */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+            className={`rounded-2xl p-6 border backdrop-blur-md relative overflow-hidden
+            ${data.edge_security?.isolation_forest_anomaly ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/20'}`}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <ShieldAlert className={data.edge_security?.isolation_forest_anomaly ? 'text-red-400' : 'text-emerald-400'} />
+              <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-zinc-400">Isolation Forest</span>
+            </div>
+            <h3 className="text-zinc-400 text-sm">IoT Network Security</h3>
+            <p className={`text-xl font-bold mt-1 ${data.edge_security?.isolation_forest_anomaly ? 'text-red-400' : 'text-emerald-400'}`}>
+              {data.edge_security?.isolation_forest_anomaly ? "ANOMALY DETECTED" : "Network Secure"}
+            </p>
+            <p className="text-xs text-zinc-500 mt-4 font-mono">Inference Latency: {data.edge_security?.inference_time_ms.toFixed(1)}ms</p>
+          </motion.div>
+
+          {/* Web3 Yield Optimization */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+            className="rounded-2xl p-6 border border-blue-500/20 bg-blue-500/10 backdrop-blur-md relative overflow-hidden"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <Sprout className="text-blue-400" />
+              <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-blue-400">Yield Oracle</span>
+            </div>
+            <h3 className="text-zinc-400 text-sm">Projected Crop Yield</h3>
+            <p className="text-3xl font-bold text-blue-400 mt-1">{data.crop_yield?.projected_yield_tha.toFixed(1)} <span className="text-lg text-blue-400/60">t/ha</span></p>
+            <p className="text-sm text-emerald-400 mt-2 font-bold">↑ +{data.crop_yield?.yield_increase_pct.toFixed(1)}% vs. Manual Control</p>
+          </motion.div>
+
+          {/* Anti-Gravity Controls (Magnetic Field & Clinostat) */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+            className="rounded-2xl p-6 border border-zinc-500/20 bg-zinc-900/80 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <Magnet className="text-purple-400" />
+              <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-zinc-400">Anti-Grav Uplink</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div>
+                <h3 className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Magnetic Field</h3>
+                <p className="text-lg font-bold text-purple-400">{data.anti_gravity?.magnetic_field_ut.toFixed(0)} <span className="text-sm text-purple-400/60">µT</span></p>
+              </div>
+              <div>
+                <h3 className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Clinostat</h3>
+                <p className="text-lg font-bold text-cyan-400">{data.anti_gravity?.clinostat_rpm.toFixed(1)} <span className="text-sm text-cyan-400/60">RPM</span></p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-black/50 p-3 rounded-xl border border-white/5">
+              <span className="text-sm text-zinc-300 flex items-center gap-2"><Speaker className="w-4 h-4 text-emerald-400" /> 40kHz Array</span>
+              <div className={`w-10 h-5 rounded-full relative cursor-pointer ${data.anti_gravity?.ultrasonic_array_active ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${data.anti_gravity?.ultrasonic_array_active ? 'left-[22px]' : 'left-0.5'}`}></div>
+              </div>
+            </div>
+          </motion.div>
+
+        </div>
+
         {/* AI & Actuation Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
@@ -322,7 +397,8 @@ export default function Home() {
             </h2>
             <p className="text-zinc-400 leading-relaxed max-w-2xl">
               Experience your farm in mixed reality. Scan the Vuforia image marker on your physical plant pot with the companion
-              Unity mobile app to project this live telemetry data as a 3D hologram hovering over the soil in real-time.
+              Unity mobile app to project this live telemetry data and a <strong className="text-white">live MJPEG video feed</strong> from your ESP32-CAM as a dynamic 3D
+              hologram hovering over the soil in real-time.
             </p>
           </div>
 

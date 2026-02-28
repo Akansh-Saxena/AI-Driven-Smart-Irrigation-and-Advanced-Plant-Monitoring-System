@@ -80,6 +80,19 @@ export async function POST(request: Request) {
       web3_ledger: {
         water_saved_liters: data.web3_ledger?.water_saved_liters || 0.0,
         wct_tokens_minted: data.web3_ledger?.wct_tokens_minted || 0
+      },
+      edge_security: {
+        isolation_forest_anomaly: data.edge_security?.isolation_forest_anomaly || false,
+        inference_time_ms: data.edge_security?.inference_time_ms || 0.0
+      },
+      anti_gravity: {
+        magnetic_field_ut: data.anti_gravity?.magnetic_field_ut || 45000.0,
+        ultrasonic_array_active: data.anti_gravity?.ultrasonic_array_active || false,
+        clinostat_rpm: data.anti_gravity?.clinostat_rpm || 0.0
+      },
+      crop_yield: {
+        projected_yield_tha: data.crop_yield?.projected_yield_tha || 14.1,
+        yield_increase_pct: data.crop_yield?.yield_increase_pct || 0.0
       }
     };
 
