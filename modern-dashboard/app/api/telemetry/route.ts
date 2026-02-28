@@ -68,6 +68,18 @@ export async function POST(request: Request) {
       tinyml_predictions: {
         et_forecast_mm_day: data.tinyml_predictions?.et_forecast_mm_day || 4.5,
         wilting_probability_24h: data.tinyml_predictions?.wilting_probability_24h || 15.0
+      },
+      computer_vision: {
+        status: data.computer_vision?.status || "Calibration Pending",
+        confidence: data.computer_vision?.confidence || 0.0
+      },
+      smfc_power: {
+        raw_voltage_mv: data.smfc_power?.raw_voltage_mv || 0.0,
+        status: data.smfc_power?.status || "Offline"
+      },
+      web3_ledger: {
+        water_saved_liters: data.web3_ledger?.water_saved_liters || 0.0,
+        wct_tokens_minted: data.web3_ledger?.wct_tokens_minted || 0
       }
     };
 
