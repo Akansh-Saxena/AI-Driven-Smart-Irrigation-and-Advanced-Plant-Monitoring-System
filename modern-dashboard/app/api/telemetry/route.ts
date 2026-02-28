@@ -1,57 +1,55 @@
 import { NextResponse } from 'next/server';
+import clientPromise from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic'; // Prevent Vercel/Render from caching this route statically
-
-// A simple in-memory store for the latest telemetry data (resets if the Render server sleeps).
-// For a production app, this should be replaced with a database like MongoDB or Supabase.
-let latestTelemetry: any = {
-  timestamp: new Date().toISOString(),
-  node_id: "esp32_zone_alpha",
-  soil_moisture: {
-    raw_voltage: 2.1,
-    kalman_filtered_v: 2.05,
-    percentage: 35.0
-  },
-  atmosphere: {
-    temperature_c: 28.5,
-    humidity_pct: 60.0
-  },
-  actuators: {
-    pump_relay_active: false,
-    flow_pulses_counted: 0
-  },
-  tinyml_predictions: {
-    et_forecast_mm_day: 5.2,
-    wilting_probability_24h: 75.0
-  }
-};
 
 // Global state to hold manual pump override command from the web UI
 let forcePumpOverride = false;
 
 export async function GET() {
-  // Check if we haven't received data in a while (e.g., 5 minutes = 300000ms)
-  const lastUpdate = new Date(latestTelemetry.timestamp).getTime();
-  const now = new Date().getTime();
-  if (now - lastUpdate > 300000 && latestTelemetry.node_id !== "OFFLINE_WARNING") {
-    // Optional: Flag data as stale if the ESP32 hasn't pinged recently
-    // console.warn("Node hasn't reported in 5 minutes");
-  }
+  try {
+    // 1. Connect to MongoDB
+    const client = await clientPromise;
+    const db = client.db("smartfarm");
+    const telemetryCollection = db.collection("telemetry_logs");
 
-  return NextResponse.json(latestTelemetry, {
-    headers: {
-      'Cache-Control': 'no-store, max-age=0',
-      'Access-Control-Allow-Origin': '*', // Useful if you ping this API from other domains
-    },
-  });
+    // 2. Fetch the 100 most recent hardware readings, sorted by timestamp descending
+    const data = await telemetryCollection
+      .find({})
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .toArray();
+
+    // 3. Keep the frontend from breaking if the database is genuinely empty
+    if (!data || data.length === 0) {
+      return NextResponse.json([{
+        timestamp: new Date().toISOString(),
+        node_id: "NO_DATA",
+        soil_moisture: { raw_voltage: 0, kalman_filtered_v: 0, percentage: 0 },
+        atmosphere: { temperature_c: 0, humidity_pct: 0 },
+        actuators: { pump_relay_active: false, flow_pulses_counted: 0 },
+        tinyml_predictions: { et_forecast_mm_day: 0, wilting_probability_24h: 0 }
+      }], { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+    }
+
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (error) {
+    console.error("Database GET Error:", error);
+    return NextResponse.json({ error: "Failed to fetch from database" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
 
-    // Update the global state with the new incoming data
-    latestTelemetry = {
+    // 1. Structure the incoming data safely
+    const newTelemetry = {
       timestamp: new Date().toISOString(),
       node_id: data.node_id || "esp32_unknown",
       soil_moisture: {
@@ -59,7 +57,6 @@ export async function POST(request: Request) {
         kalman_filtered_v: data.soil_moisture?.kalman_filtered_v || 0,
         percentage: data.soil_moisture?.percentage || 0
       },
-      // If the ESP32 doesn't send atmosphere data, keep the old values or mock them
       atmosphere: {
         temperature_c: data.atmosphere?.temperature_c || 32.5,
         humidity_pct: data.atmosphere?.humidity_pct || 45.0
@@ -74,22 +71,28 @@ export async function POST(request: Request) {
       }
     };
 
-    console.log(`[Telemetry Received] Node: ${latestTelemetry.node_id} | Moisture: ${latestTelemetry.soil_moisture.percentage.toFixed(1)}%`);
+    // 2. Insert directly into MongoDB Atlas
+    const client = await clientPromise;
+    const db = client.db("smartfarm");
+    const telemetryCollection = db.collection("telemetry_logs");
 
-    // We respond with instructions back to the ESP32 (e.g. telling it to turn the pump on manually)
-    // Eventually, your page.tsx button could set this `forcePumpOverride` variable to true!
+    await telemetryCollection.insertOne(newTelemetry);
+
+    console.log(`[MongoDB Insert] Node: ${newTelemetry.node_id} | Moisture: ${newTelemetry.soil_moisture.percentage.toFixed(1)}%`);
+
+    // 3. Send manual actuation override back to the physical IoT device
     const responsePayload = {
       status: "success",
       force_pump: forcePumpOverride
     };
 
-    // If we just told the ESP32 to force the pump, reset the manual override flag
+    // 4. Reset the state once command is sent
     if (forcePumpOverride) forcePumpOverride = false;
 
     return NextResponse.json(responsePayload, { status: 200 });
 
   } catch (error) {
-    console.error("Failed to parse incoming telemetry:", error);
-    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    console.error("Database POST Error:", error);
+    return NextResponse.json({ error: "Failed to process telemetry insertion" }, { status: 400 });
   }
 }
