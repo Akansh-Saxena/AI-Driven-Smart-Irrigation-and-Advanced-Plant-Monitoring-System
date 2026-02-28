@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/MetricCard";
+import { HistoricalChart } from "@/components/HistoricalChart";
 import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -28,16 +29,16 @@ interface TelemetryData {
 }
 
 export default function Home() {
-  const [data, setData] = useState<TelemetryData | null>(null);
+  const [history, setHistory] = useState<TelemetryData[] | null>(null);
   const [isForcingPump, setIsForcingPump] = useState(false);
 
   useEffect(() => {
-    // Poll the mock API every 2 seconds to simulate live WebSocket/MQTT
+    // Poll the Next.js API every 2 seconds to fetch the latest MongoDB Array
     const fetchTelemetry = async () => {
       try {
         const res = await fetch("/api/telemetry");
         const json = await res.json();
-        setData(json);
+        setHistory(json);
       } catch (err) {
         console.error("Failed to fetch telemetry", err);
       }
@@ -48,7 +49,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!data) {
+  if (!history || history.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white font-sans">
         <div className="animate-pulse flex flex-col items-center">
@@ -64,6 +65,8 @@ export default function Home() {
     // In a real app, POST to /api/control here
     setTimeout(() => setIsForcingPump(false), 3000);
   };
+
+  const data = history[0]; // Extract the absolute latest reading for the top dashboard cards
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-blue-500/30">
@@ -209,6 +212,10 @@ export default function Home() {
           </motion.div>
 
         </div>
+
+        {/* Database Historical Chart */}
+        <HistoricalChart data={history} />
+
       </main>
 
       {/* Basic shine animation keyframe added to global styles implicitly via inline class if needed, or tailwind config */}
