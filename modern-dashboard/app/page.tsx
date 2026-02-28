@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/MetricCard";
 import { HistoricalChart } from "@/components/HistoricalChart";
-import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets } from "lucide-react";
+import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface TelemetryData {
@@ -25,6 +25,18 @@ interface TelemetryData {
   tinyml_predictions: {
     et_forecast_mm_day: number;
     wilting_probability_24h: number;
+  };
+  computer_vision?: {
+    status: string;
+    confidence: number;
+  };
+  smfc_power?: {
+    raw_voltage_mv: number;
+    status: string;
+  };
+  web3_ledger?: {
+    water_saved_liters: number;
+    wct_tokens_minted: number;
   };
 }
 
@@ -134,8 +146,89 @@ export default function Home() {
           />
         </div>
 
+        {/* --- FUTURISTIC UPGRADES GRID --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+          {/* Edge AI Computer Vision Panel */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className={`rounded-2xl p-6 border backdrop-blur-md relative overflow-hidden flex flex-col justify-between
+            ${data.computer_vision?.status.includes('Blight') ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/20'}`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <Leaf className={data.computer_vision?.status.includes('Blight') ? 'text-red-400' : 'text-emerald-400'} />
+                <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-zinc-400">ESP32-CAM CNN</span>
+              </div>
+              <h3 className="text-zinc-400 text-sm">Biometric Vision Scan</h3>
+              <p className={`text-xl font-bold mt-1 ${data.computer_vision?.status.includes('Blight') ? 'text-red-400' : 'text-emerald-400'}`}>
+                {data.computer_vision?.status || "Calibration Pending"}
+              </p>
+            </div>
+            <div className="mt-4">
+              <p className="text-xs text-zinc-500 mb-1">Neural Net Confidence</p>
+              <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${data.computer_vision?.status.includes('Blight') ? 'bg-red-500' : 'bg-emerald-500'}`}
+                  style={{ width: `${data.computer_vision?.confidence || 0}%` }}
+                />
+              </div>
+              <p className="text-right text-xs mt-1 text-zinc-400">{data.computer_vision?.confidence?.toFixed(1) || 0}%</p>
+            </div>
+          </motion.div>
+
+          {/* Biological SMFC Battery Panel */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            className="rounded-2xl p-6 border border-amber-500/20 bg-amber-500/10 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <Zap className="text-amber-400" />
+                <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-amber-400">Bio-Battery</span>
+              </div>
+              <h3 className="text-zinc-400 text-sm">Soil Microbial Power (SMFC)</h3>
+              <p className="text-3xl font-bold text-amber-500 mt-1">{data.smfc_power?.raw_voltage_mv?.toFixed(0) || 0} <span className="text-lg text-amber-500/60">mV</span></p>
+            </div>
+            <p className="text-xs text-amber-400/80 bg-amber-500/10 px-3 py-2 rounded-lg mt-4 w-fit border border-amber-500/20">
+              {data.smfc_power?.status || "Harvesting Electrons..."}
+            </p>
+          </motion.div>
+
+          {/* Web3 Water Ledger Panel */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="col-span-1 md:col-span-2 rounded-2xl p-6 border border-purple-500/20 bg-purple-500/10 backdrop-blur-md relative overflow-hidden flex flex-col justify-center"
+          >
+            <div className="absolute right-[-20px] top-[-20px] opacity-10">
+              <Coins className="w-48 h-48 rotate-12" />
+            </div>
+
+            <div className="relative z-10 grid grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Droplet className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-zinc-400 text-sm">Water Saved</h3>
+                </div>
+                <p className="text-3xl font-bold text-blue-400">{data.web3_ledger?.water_saved_liters?.toFixed(1) || 0} <span className="text-lg text-blue-400/60">L</span></p>
+              </div>
+
+              <div className="border-l border-white/10 pl-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Coins className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-zinc-400 text-sm">Web3 Tokens Minted</h3>
+                </div>
+                <p className="text-3xl font-bold text-purple-400">{data.web3_ledger?.wct_tokens_minted || 0} <span className="text-lg text-purple-400/60">WCT</span></p>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
+              <p className="text-xs text-zinc-500 font-mono">Blockchain Oracle: Polygon Mumbai Testnet</p>
+              <span className="animate-pulse w-2 h-2 bg-emerald-500 rounded-full"></span>
+            </div>
+          </motion.div>
+
+        </div>
+
         {/* AI & Actuation Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
           {/* Neural Network Forecast Panel */}
           <motion.div
@@ -217,6 +310,31 @@ export default function Home() {
           </motion.div>
 
         </div>
+
+        {/* AR Digital Twin Portal */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+          className="mb-10 w-full rounded-2xl bg-gradient-to-r from-zinc-900 to-black border border-white/10 p-8 flex flex-col md:flex-row items-center justify-between gap-8"
+        >
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-3 flex items-center gap-3">
+              <ScanLine className="text-cyan-400 w-8 h-8" />
+              AR Digital Twin Portal
+            </h2>
+            <p className="text-zinc-400 leading-relaxed max-w-2xl">
+              Experience your farm in mixed reality. Scan the Vuforia image marker on your physical plant pot with the companion
+              Unity mobile app to project this live telemetry data as a 3D hologram hovering over the soil in real-time.
+            </p>
+          </div>
+
+          <div className="flex-shrink-0 w-32 h-32 bg-white p-2 rounded-xl border-4 border-zinc-800 shadow-2xl rotate-3 hover:rotate-0 transition-transform cursor-pointer">
+            {/* Mock QR/Vuforia Image Target */}
+            <div className="w-full h-full bg-black flex flex-col items-center justify-center p-2 text-center text-[10px] font-mono text-zinc-500 uppercase tracking-widest relative overflow-hidden">
+              <div className="absolute inset-2 border-2 border-dashed border-zinc-700 pointer-events-none" />
+              <ScanLine className="w-8 h-8 text-white mb-1" />
+              Vuforia Target
+            </div>
+          </div>
+        </motion.div>
 
         {/* Database Historical Chart */}
         <HistoricalChart data={history} />
