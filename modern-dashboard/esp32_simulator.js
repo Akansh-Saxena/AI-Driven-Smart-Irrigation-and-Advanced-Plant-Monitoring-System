@@ -1,15 +1,54 @@
 // ESP32 Hardware Simulator for Live Render Dashboard Testing
 // Run this file using: node esp32_simulator.js
 
+const mqtt = require('mqtt');
+
 const RENDER_API_URL = "https://ai-driven-smart-irrigation-and-advanced.onrender.com/api/telemetry";
 
-console.log("🚀 Starting ESP32 Hardware Simulator...");
-console.log(`📡 Target API: ${RENDER_API_URL}\n`);
+// Connect to a public, free MQTT broker (HiveMQ)
+const MQTT_BROKER = "mqtt://broker.hivemq.com:1883";
+const MQTT_TOPIC_SUBSCRIPTION = "smartfarm/control/esp32";
+
+const client = mqtt.connect(MQTT_BROKER);
+
+console.log("🚀 Starting Two-Way Cyber-Physical Interface (MQTT + HTTP)...");
+console.log(`📡 HTTP Target: ${RENDER_API_URL}`);
+console.log(`🔌 MQTT Broker: ${MQTT_BROKER}\n`);
 
 // Simulated Hardware Variables
 let x_est = 1.0; // Kalman filtered voltage (1.0V = 100% moisture, 2.5V = 0% moisture)
 let isPumpActive = false;
 let total_pulses = 0;
+let toggleArray = false; // Toggles the Anti-Grav ultrasound feature
+let clinostatSpeed = 15.5; // Base RPM
+
+// --- MQTT BI-DIRECTIONAL EVENT LISTENER ---
+client.on('connect', () => {
+    console.log(`✅ [MQTT] Connected to WebSockets Broker! Subscribing to: ${MQTT_TOPIC_SUBSCRIPTION}`);
+    client.subscribe(MQTT_TOPIC_SUBSCRIPTION);
+});
+
+client.on('message', (topic, message) => {
+    try {
+        const command = JSON.parse(message.toString());
+        console.log(`\n🔔 [MQTT INCOMING COMMAND] Triggering Hardware Actuation:`, command);
+
+        // Actuation Logic based on Next.js Cloud WebSockets
+        if (command.action === "ENABLE_40KHZ_ARRAY") {
+            toggleArray = true;
+            console.log("🟢 [HARDWARE] 40kHz Ultrasonic Phased Array ACTIVATED for targeted fungicide delivery.");
+        } else if (command.action === "ROTATE_CLINOSTAT") {
+            clinostatSpeed = command.rpm || 30.0;
+            console.log(`🔄 [HARDWARE] Clinostat speed overridden to ${clinostatSpeed} RPM.`);
+        } else if (command.action === "FORCE_PUMP") {
+            isPumpActive = true;
+            console.log("💧 [HARDWARE] Soil Pump Relay overridden. Injecting water.");
+        }
+    } catch (err) {
+        console.error("❌ Failed to parse MQTT incoming command", err);
+    }
+});
+// ------------------------------------------
 
 // Helper: Random variance generator
 const randomVariance = (max) => (Math.random() * max * 2) - max;
@@ -45,7 +84,7 @@ async function runLoop() {
         isPumpActive = false;
     }
 
-    // 3. Simulate TinyML Prediction
+    // Simulate TinyML Prediction
     let ai_prob = 15.0 + randomVariance(5);
     if (x_est > 2.0) ai_prob = 85.5 + randomVariance(10);
     else if (x_est > 1.5) ai_prob = 40.2 + randomVariance(5);
@@ -57,6 +96,10 @@ async function runLoop() {
             raw_voltage: x_est + randomVariance(0.05),
             kalman_filtered_v: x_est,
             percentage: pct
+        },
+        atmosphere: {
+            temperature_c: 32.5 + randomVariance(0.5),
+            humidity_pct: 45.0 + randomVariance(2.0)
         },
         actuators: {
             pump_relay_active: isPumpActive,
@@ -83,12 +126,12 @@ async function runLoop() {
             inference_time_ms: 12.4 + randomVariance(2.0)
         },
         anti_gravity: {
-            magnetic_field_ut: 45000 + randomVariance(500), // Earth is ~45k, neodymium levitation adds variance
-            ultrasonic_array_active: false,
-            clinostat_rpm: 15.5 + randomVariance(0.2)
+            magnetic_field_ut: 45000 + randomVariance(500),
+            ultrasonic_array_active: toggleArray,
+            clinostat_rpm: clinostatSpeed + randomVariance(0.2)
         },
         crop_yield: {
-            projected_yield_tha: 14.1 + (waterSavedLiters / 250), // Standard 14 t/ha scaling up towards 20 t/ha over time
+            projected_yield_tha: 14.1 + (waterSavedLiters / 250),
             yield_increase_pct: ((waterSavedLiters / 250) / 14.1) * 100
         }
     };

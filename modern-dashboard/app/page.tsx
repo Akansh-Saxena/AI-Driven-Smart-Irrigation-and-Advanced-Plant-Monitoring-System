@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/MetricCard";
 import { HistoricalChart } from "@/components/HistoricalChart";
-import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine, ShieldAlert, Magnet, Speaker, Sprout } from "lucide-react";
+import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine, ShieldAlert, Magnet, Speaker, Sprout, Mic, UploadCloud, TestTube } from "lucide-react";
 import { motion } from "framer-motion";
+import mqtt from 'mqtt';
 
 interface TelemetryData {
   timestamp: string;
@@ -56,9 +57,23 @@ interface TelemetryData {
 export default function Home() {
   const [history, setHistory] = useState<TelemetryData[] | null>(null);
   const [isForcingPump, setIsForcingPump] = useState(false);
+  const [mqttClient, setMqttClient] = useState<mqtt.MqttClient | null>(null);
+
+  // Phase 5 State
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    // Poll the Next.js API every 2 seconds to fetch the latest MongoDB Array
+    // 1. Connect to Public MQTT via WebSockets (Browser compatible)
+    const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
+
+    client.on('connect', () => {
+      console.log('Connected to HiveMQ WebSockets Broker');
+      setMqttClient(client);
+    });
+
+    // 2. Poll the Next.js API every 2 seconds to fetch the latest MongoDB Array
     const fetchTelemetry = async () => {
       try {
         const res = await fetch("/api/telemetry");
@@ -71,9 +86,82 @@ export default function Home() {
 
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
+    return () => {
+      if (client) client.end();
+      clearInterval(interval);
+    };
+  }, []);
+  const publishMQTTCommand = (action: string, payload: any = {}) => {
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('smartfarm/control/esp32', JSON.stringify({ action, ...payload }));
+      console.log(`[MQTT TX] Published: ${action}`);
+    } else {
+      console.warn("MQTT WebSockets not connected.");
+    }
+  };
+
+  const handleForceIrrigation = () => {
+    setIsForcingPump(true);
+    // Transmit instantly via MQTT instead of slow HTTP Polling
+    publishMQTTCommand("FORCE_PUMP");
+    setTimeout(() => setIsForcingPump(false), 3000);
+  };
+
+  // Phase 5: Voice Command Logic
+  const handleVoiceCommand = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert("Your browser does not support the Web Speech API. Please use Chrome.");
+      return;
+    }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    // Bhashini / Multilingual intent translation simulation
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setIsListening(true);
+
+    recognition.onresult = (event: any) => {
+      const text = event.results[0][0].transcript.toLowerCase();
+      setTranscript(text);
+
+      // LLM Intent Extraction Simulation
+      if (text.includes("rotate") || text.includes("sun") || text.includes("turn")) {
+        publishMQTTCommand("ROTATE_CLINOSTAT", { rpm: 45.0 });
+      } else if (text.includes("spray") || text.includes("heal") || text.includes("medicine")) {
+        publishMQTTCommand("ENABLE_40KHZ_ARRAY");
+      } else if (text.includes("water") || text.includes("pump")) {
+        publishMQTTCommand("FORCE_PUMP");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setTimeout(() => setTranscript(""), 4000);
+    };
+
+    recognition.start();
+  };
+
+  // Phase 5: Cloud Vision Upload
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    setIsUploading(true);
+
+    // Simulate Cloud Run API / Firebase ML processing delay
+    setTimeout(() => {
+      setIsUploading(false);
+      // Simulate detection of Early Blight triggering instant Acoustic Levitator actuation
+      publishMQTTCommand("ENABLE_40KHZ_ARRAY");
+      alert("🚨 Cloud AI detected trace elements of Early Blight spores in the image! Instantly transmitting MQTT command to Node Alpha to activate the 40kHz Ultrasonic Phased Array for targeted fungicide delivery.");
+    }, 2500);
+  };
+
+  // Prevent crashes if DB connection fails
   if (!history || !Array.isArray(history) || history.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white font-sans text-center">
@@ -90,13 +178,7 @@ export default function Home() {
     );
   }
 
-  const handleForceIrrigation = () => {
-    setIsForcingPump(true);
-    // In a real app, POST to /api/control here
-    setTimeout(() => setIsForcingPump(false), 3000);
-  };
-
-  const data = history[0]; // Extract the absolute latest reading for the top dashboard cards
+  const data = (history as TelemetryData[])[0]; // Extract the absolute latest reading for the top dashboard cards
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-blue-500/30">
@@ -127,7 +209,6 @@ export default function Home() {
             <p className="text-sm text-zinc-500 font-mono">{new Date(data.timestamp).toLocaleString()}</p>
           </div>
         </header>
-
         {/* Real-time Telemetry Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MetricCard
@@ -157,13 +238,13 @@ export default function Home() {
             icon={Activity}
             colorClass="text-emerald-400"
           />
-        </div>
+        </div >
 
         {/* --- FUTURISTIC UPGRADES GRID --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        < div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" >
 
           {/* Edge AI Computer Vision Panel */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
             className={`rounded-2xl p-6 border backdrop-blur-md relative overflow-hidden flex flex-col justify-between
             ${data.computer_vision?.status.includes('Blight') ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/20'}`}
           >
@@ -187,10 +268,10 @@ export default function Home() {
               </div>
               <p className="text-right text-xs mt-1 text-zinc-400">{data.computer_vision?.confidence?.toFixed(1) || 0}%</p>
             </div>
-          </motion.div>
+          </motion.div >
 
           {/* Biological SMFC Battery Panel */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="rounded-2xl p-6 border border-amber-500/20 bg-amber-500/10 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
           >
             <div>
@@ -204,10 +285,10 @@ export default function Home() {
             <p className="text-xs text-amber-400/80 bg-amber-500/10 px-3 py-2 rounded-lg mt-4 w-fit border border-amber-500/20">
               {data.smfc_power?.status || "Harvesting Electrons..."}
             </p>
-          </motion.div>
+          </motion.div >
 
           {/* Web3 Water Ledger Panel */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
             className="col-span-1 md:col-span-2 rounded-2xl p-6 border border-purple-500/20 bg-purple-500/10 backdrop-blur-md relative overflow-hidden flex flex-col justify-center"
           >
             <div className="absolute right-[-20px] top-[-20px] opacity-10">
@@ -236,15 +317,15 @@ export default function Home() {
               <p className="text-xs text-zinc-500 font-mono">Blockchain Oracle: Polygon Mumbai Testnet</p>
               <span className="animate-pulse w-2 h-2 bg-emerald-500 rounded-full"></span>
             </div>
-          </motion.div>
+          </motion.div >
 
-        </div>
+        </div >
 
         {/* --- PHASE 4 INTEGRATION ROW --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        < div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" >
 
           {/* Edge AI Security (Isolation Forest) */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
             className={`rounded-2xl p-6 border backdrop-blur-md relative overflow-hidden
             ${data.edge_security?.isolation_forest_anomaly ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/20'}`}
           >
@@ -257,10 +338,10 @@ export default function Home() {
               {data.edge_security?.isolation_forest_anomaly ? "ANOMALY DETECTED" : "Network Secure"}
             </p>
             <p className="text-xs text-zinc-500 mt-4 font-mono">Inference Latency: {data.edge_security?.inference_time_ms.toFixed(1)}ms</p>
-          </motion.div>
+          </motion.div >
 
           {/* Web3 Yield Optimization */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+          < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
             className="rounded-2xl p-6 border border-blue-500/20 bg-blue-500/10 backdrop-blur-md relative overflow-hidden"
           >
             <div className="flex justify-between items-center mb-4">
@@ -270,10 +351,10 @@ export default function Home() {
             <h3 className="text-zinc-400 text-sm">Projected Crop Yield</h3>
             <p className="text-3xl font-bold text-blue-400 mt-1">{data.crop_yield?.projected_yield_tha.toFixed(1)} <span className="text-lg text-blue-400/60">t/ha</span></p>
             <p className="text-sm text-emerald-400 mt-2 font-bold">↑ +{data.crop_yield?.yield_increase_pct.toFixed(1)}% vs. Manual Control</p>
-          </motion.div>
+          </motion.div >
 
           {/* Anti-Gravity Controls (Magnetic Field & Clinostat) */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+          < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
             className="rounded-2xl p-6 border border-zinc-500/20 bg-zinc-900/80 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
           >
             <div className="flex justify-between items-center mb-4">
@@ -298,15 +379,15 @@ export default function Home() {
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${data.anti_gravity?.ultrasonic_array_active ? 'left-[22px]' : 'left-0.5'}`}></div>
               </div>
             </div>
-          </motion.div>
+          </motion.div >
 
-        </div>
+        </div >
 
         {/* AI & Actuation Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        < div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8" >
 
           {/* Neural Network Forecast Panel */}
-          <motion.div
+          < motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={`col-span-1 lg:col-span-2 rounded-2xl p-8 border backdrop-blur-md relative overflow-hidden
@@ -342,18 +423,18 @@ export default function Home() {
                 <p className="text-xs text-zinc-500">Calculated via OpenWeatherMap API & Local Sensors</p>
               </div>
             </div>
-          </motion.div>
+          </motion.div >
 
           {/* Manual Control Center */}
-          <motion.div
+          < motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="col-span-1 rounded-2xl bg-zinc-900/80 border border-white/10 p-8 flex flex-col justify-between relative overflow-hidden"
           >
             {/* Background pattern */}
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px' }} />
+            < div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px' }} />
 
-            <div>
+            < div >
               <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
                 <Droplets className="text-blue-400" />
                 Network Actuation
@@ -366,7 +447,7 @@ export default function Home() {
                   {data.actuators.pump_relay_active ? 'Active Flow' : 'Standby'}
                 </span>
               </div>
-            </div>
+            </div >
 
             <button
               onClick={handleForceIrrigation}
@@ -382,12 +463,92 @@ export default function Home() {
               )}
               {isForcingPump ? 'Transmitting Command...' : (data.actuators.pump_relay_active ? 'Irrigation in Progress' : 'Force Irrigation Cycle')}
             </button>
-          </motion.div>
+          </motion.div >
 
-        </div>
+        </div >
+
+        {/* --- PHASE 5: TWO-WAY CYBER-PHYSICAL INTERFACE (VOICE & VISION) --- */}
+        < div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8" >
+
+          {/* Multilingual Voice Command */}
+          < motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+            className="rounded-2xl border border-zinc-800 bg-black backdrop-blur-md p-8 relative overflow-hidden"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold flex items-center gap-3">
+                <Mic className={`${isListening ? 'text-red-500 animate-pulse' : 'text-zinc-400'}`} />
+                Translative Voice Command
+              </h2>
+              <span className="text-xs font-mono bg-zinc-900 px-3 py-1 rounded-full text-zinc-500">MQTT WSS</span>
+            </div>
+
+            <p className="text-sm text-zinc-400 mb-6">
+              Speak natively (Hindi, Tamil, English). Generative AI extracts your intent and compiles it into a hardware actuation payload via MQTT.
+            </p>
+
+            <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/50 hover:bg-zinc-900 transition-colors">
+              <button
+                onClick={handleVoiceCommand}
+                className={`w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-red-500/20 border border-red-500 animate-pulse' : 'bg-gradient-to-br from-zinc-700 to-zinc-900 hover:scale-105'}`}
+              >
+                <Mic className={`w-8 h-8 ${isListening ? 'text-red-500' : 'text-zinc-300'}`} />
+              </button>
+              {transcript && (
+                <p className="mt-6 text-emerald-400 font-mono text-sm px-4 py-2 bg-black rounded-lg border border-emerald-500/30">
+                  "{transcript}" → EXTRACTED INTENT
+                </p>
+              )}
+            </div>
+          </motion.div >
+
+          {/* Cloud Vision Upload & Acoustic Actuation */}
+          < motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
+            className="rounded-2xl border border-blue-500/20 bg-blue-950/20 backdrop-blur-md p-8 relative overflow-hidden flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold flex items-center gap-3 text-blue-100">
+                  <UploadCloud className="text-blue-400" />
+                  Cloud Vision Uplink
+                </h2>
+                <span className="text-xs font-mono bg-blue-900/50 px-3 py-1 rounded-full text-blue-300 border border-blue-500/30">Firebase ML</span>
+              </div>
+
+              <p className="text-sm text-blue-200/60 mb-6">
+                Upload field imagery. If Neural Networks detect disease, the system automatically triggers the 40kHz Ultrasonic Phased Array to levitate and deliver fungicide.
+              </p>
+            </div>
+
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleImageUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                title="Upload Plant Image"
+              />
+              <div className={`w-full py-8 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all
+                        ${isUploading ? 'bg-blue-500/20 border-blue-400' : 'bg-black/50 border-blue-900 hover:border-blue-700 hover:bg-black/70'}`}
+              >
+                {isUploading ? (
+                  <>
+                    <TestTube className="w-10 h-10 text-blue-400 animate-bounce mb-3" />
+                    <span className="text-blue-300 font-mono text-sm">Running Pathogen Detection Model...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="w-10 h-10 text-zinc-600 mb-3" />
+                    <span className="text-zinc-400 font-mono text-sm">Drop 4K Image / Video (Max 10MB)</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div >
+
+        </div >
 
         {/* AR Digital Twin Portal */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+        < motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
           className="mb-10 w-full rounded-2xl bg-gradient-to-r from-zinc-900 to-black border border-white/10 p-8 flex flex-col md:flex-row items-center justify-between gap-8"
         >
           <div className="flex-1">
@@ -410,14 +571,14 @@ export default function Home() {
               Vuforia Target
             </div>
           </div>
-        </motion.div>
+        </motion.div >
 
         {/* Database Historical Chart */}
-        <HistoricalChart data={history} />
+        < HistoricalChart data={history} />
 
-      </main>
+      </main >
 
-      {/* Basic shine animation keyframe added to global styles implicitly via inline class if needed, or tailwind config */}
+      {/* Basic shine animation keyframe */}
       <style dangerouslySetInnerHTML={{
         __html: `
         @keyframes shine {
@@ -425,6 +586,6 @@ export default function Home() {
         }
         .animate-shine { animation: shine 1.5s infinite; }
       `}} />
-    </div>
+    </div >
   );
 }

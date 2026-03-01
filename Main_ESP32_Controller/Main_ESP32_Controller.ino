@@ -1,11 +1,14 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <PubSubClient.h>
 #include "model.h" // Neural network weights for TinyML
 
 // --- HARDWARE PIN CONFIGURATION ---
 #define MOISTURE_PIN 34     
 #define RELAY_PIN 26        
 #define FLOW_SENSOR_PIN 25  
+#define CLINOSTAT_PIN 27
+#define ARRAY_40KHZ_PIN 14
 
 // --- KALMAN FILTER & EFFICIENCY VARIABLES ---
 // RTC_DATA_ATTR saves these variables in RTC memory during Deep Sleep
@@ -27,11 +30,60 @@ unsigned long awakeStartTime;
 
 // --- CLOUD CONFIGURATION ---
 // IMPORTANT: REPLACE THIS WITH YOUR ACTUAL HOME OR PHONE HOTSPOT WI-FI DETAILS!
-const char* ssid = "YOUR_WIFI_NAME";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "Danger";
+const char* password = "sairamSR@4555";
 
 // Your live Render API URL
 const char* serverName = "https://ai-driven-smart-irrigation-and-advanced.onrender.com/api/telemetry";
+
+const char* mqtt_server = "broker.hivemq.com";
+const int mqtt_port = 1883;
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String message;
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.print("MQTT Command Received [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  Serial.println(message);
+
+  if (message.indexOf("FORCE_PUMP") >= 0) {
+    isPumpActive = true;
+    digitalWrite(RELAY_PIN, HIGH);
+    awakeStartTime = millis(); // Stay awake longer to pump
+    Serial.println(">>> ACTIVATING WATER PUMP");
+  } else if (message.indexOf("ROTATE_CLINOSTAT") >= 0) {
+    digitalWrite(CLINOSTAT_PIN, HIGH);
+    Serial.println(">>> ROTATING CLINOSTAT AT 45 RPM");
+  } else if (message.indexOf("ENABLE_40KHZ_ARRAY") >= 0) {
+    digitalWrite(ARRAY_40KHZ_PIN, HIGH);
+    Serial.println(">>> FIRING 40kHz ULTRASONIC ARRAY FOR TARGETED LEVITATION/MEDICINE");
+  }
+}
+
+void reconnectMQTT() {
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Create a random client ID
+    String clientId = "ESP32-Farm-";
+    clientId += String(random(0xffff), HEX);
+    
+    if (mqttClient.connect(clientId.c_str())) {
+      Serial.println("Connected to HiveMQ Broker!");
+      mqttClient.subscribe("smartfarm/control/esp32"); // The Command Topic
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 2 seconds");
+      delay(2000);
+    }
+  }
+}
 
 void IRAM_ATTR flowSensorInterrupt() {
   total_pulses++;
@@ -45,6 +97,12 @@ void setup() {
   pinMode(MOISTURE_PIN, INPUT);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW); 
+
+  pinMode(CLINOSTAT_PIN, OUTPUT);
+  digitalWrite(CLINOSTAT_PIN, LOW);
+
+  pinMode(ARRAY_40KHZ_PIN, OUTPUT);
+  digitalWrite(ARRAY_40KHZ_PIN, LOW);
 
   pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), flowSensorInterrupt, FALLING);
@@ -63,6 +121,10 @@ void setup() {
     Serial.println("");
     Serial.print("Connected! IP address: ");
     Serial.println(WiFi.localIP());
+    
+    // Configure MQTT Broker
+    mqttClient.setServer(mqtt_server, mqtt_port);
+    mqttClient.setCallback(mqttCallback);
   } else {
     Serial.println("\nFailed to connect to Wi-Fi. Check credentials.");
   }
@@ -91,8 +153,14 @@ void loop() {
       digitalWrite(RELAY_PIN, HIGH);
   }
 
-  // --- 3. SEND TELEMETRY TO RENDER CLOUD ---
+  // --- 3. SEND TELEMETRY TO RENDER CLOUD & CHECK MQTT ---
   if(WiFi.status() == WL_CONNECTED) {
+    // Check MQTT incoming messages
+    if (!mqttClient.connected()) {
+      reconnectMQTT();
+    }
+    mqttClient.loop();
+
     HTTPClient http;
     
     // Simulate TinyML
