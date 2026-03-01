@@ -24,6 +24,9 @@ The architecture is divided into the following distinct software domains, each g
 *   **`Research_and_Implementation_Guide.md`**:
     The master blueprint containing exhaustive scientific rationale, socio-economic context (e.g., UP groundwater crisis), hardware wiring requirements, and step-by-step physical assembly instructions for all modules.
 
+*   **`modern-dashboard/`**:
+    A full-stack Next.js web application functioning as the central command and monitoring interface. Features real-time AI analytics, WebSockets for IoT data streaming, AR integration options, and user-friendly visualizations. Deployed manually or automatically via Vercel.
+
 ## Getting Started
 
 1.  Open the `.ino` files in the **Arduino IDE**.
