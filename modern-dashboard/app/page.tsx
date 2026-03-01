@@ -66,7 +66,8 @@ export default function Home() {
 
   useEffect(() => {
     // 1. Connect to Public MQTT via WebSockets (Browser compatible)
-    const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
+    // using wss:// on port 8884 to satisfy HTTPS Mixed Content rules
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
     client.on('connect', () => {
       console.log('Connected to HiveMQ WebSockets Broker');
