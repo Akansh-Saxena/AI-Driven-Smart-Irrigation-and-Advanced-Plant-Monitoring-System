@@ -92,10 +92,15 @@ async function runLoop() {
     // 4. Construct Payload (matching Arduino C++ logic)
     const payload = {
         node_id: "esp32_zone_alpha",
+        location: {
+            lat: 25.4358,  // Prayagraj, UP, India
+            lng: 81.8463,
+            satellites: 6
+        },
         soil_moisture: {
-            raw_voltage: x_est + randomVariance(0.05),
-            kalman_filtered_v: x_est,
-            percentage: pct
+            raw_voltage: parseFloat((x_est + randomVariance(0.05)).toFixed(2)),
+            kalman_filtered_v: parseFloat(x_est.toFixed(2)),
+            percentage: parseFloat(pct.toFixed(1))
         },
         atmosphere: {
             temperature_c: 32.5 + randomVariance(0.5),
@@ -103,11 +108,13 @@ async function runLoop() {
         },
         actuators: {
             pump_relay_active: isPumpActive,
-            flow_pulses_counted: total_pulses
+            flow_pulses_counted: total_pulses,
+            clinostat_rotating: clinostatSpeed > 0,
+            acoustic_array_active: toggleArray
         },
         tinyml_predictions: {
-            et_forecast_mm_day: 4.2 + randomVariance(0.5),
-            wilting_probability_24h: ai_prob
+            et_forecast_mm_day: 4.68,
+            wilting_probability_24h: parseFloat(ai_prob.toFixed(1))
         },
         computer_vision: {
             status: ai_prob > 80 ? "Early Blight Detected" : "Healthy",
@@ -131,8 +138,9 @@ async function runLoop() {
             clinostat_rpm: clinostatSpeed + randomVariance(0.2)
         },
         crop_yield: {
-            projected_yield_tha: 14.1 + (waterSavedLiters / 250),
-            yield_increase_pct: ((waterSavedLiters / 250) / 14.1) * 100
+            projected_yield_tha: 20.4 + randomVariance(0.5), // Increased from 14 t/ha
+            yield_increase_pct: 32.5,
+            water_use_efficiency: parseFloat(((20.4 + randomVariance(0.5)) / (total_pulses * 0.1 || 1)).toFixed(2)) // Simulated WUE
         }
     };
 

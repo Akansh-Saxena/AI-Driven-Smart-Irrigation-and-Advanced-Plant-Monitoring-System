@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/MetricCard";
 import { HistoricalChart } from "@/components/HistoricalChart";
-import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine, ShieldAlert, Magnet, Speaker, Sprout, Mic, UploadCloud, TestTube } from "lucide-react";
+import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap, Coins, ScanLine, ShieldAlert, Magnet, Speaker, Sprout, Mic, UploadCloud, TestTube, MapPin, Map } from "lucide-react";
 import { motion } from "framer-motion";
 import mqtt from 'mqtt';
+import LocationMap from "@/components/LocationMap";
 
 interface TelemetryData {
   timestamp: string;
   node_id: string;
+  location?: {
+    lat: number;
+    lng: number;
+    satellites: number;
+  };
   soil_moisture: {
     raw_voltage: number;
     kalman_filtered_v: number;
@@ -51,6 +57,7 @@ interface TelemetryData {
   crop_yield?: {
     projected_yield_tha: number;
     yield_increase_pct: number;
+    water_use_efficiency?: number;
   };
 }
 
@@ -63,6 +70,9 @@ export default function Home() {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+
+  // Phase 4 Weather State
+  const [weatherData, setWeatherData] = useState<any>(null);
 
   useEffect(() => {
     // 1. Connect to Public MQTT via WebSockets (Browser compatible)
@@ -80,6 +90,21 @@ export default function Home() {
         const res = await fetch("/api/telemetry");
         const json = await res.json();
         setHistory(json);
+
+        // Fetch weather if we have location and haven't fetched weather yet
+        if (json && json.length > 0 && json[0].location && !weatherData) {
+          const lat = json[0].location.lat;
+          const lng = json[0].location.lng;
+          try {
+            const weatherRes = await fetch(`/api/weather?lat=${lat}&lon=${lng}`);
+            const weatherJson = await weatherRes.json();
+            if (!weatherJson.error) {
+              setWeatherData(weatherJson);
+            }
+          } catch (e) {
+            console.error("Failed to fetch weather", e);
+          }
+        }
       } catch (err) {
         console.error("Failed to fetch telemetry", err);
       }
@@ -125,17 +150,31 @@ export default function Home() {
 
     recognition.onstart = () => setIsListening(true);
 
-    recognition.onresult = (event: any) => {
-      const text = event.results[0][0].transcript.toLowerCase();
+    recognition.onresult = async (event: any) => {
+      const text = event.results[0][0].transcript;
       setTranscript(text);
 
-      // LLM Intent Extraction Simulation
-      if (text.includes("rotate") || text.includes("sun") || text.includes("turn")) {
-        publishMQTTCommand("ROTATE_CLINOSTAT", { rpm: 45.0 });
-      } else if (text.includes("spray") || text.includes("heal") || text.includes("medicine")) {
-        publishMQTTCommand("ENABLE_40KHZ_ARRAY");
-      } else if (text.includes("water") || text.includes("pump")) {
-        publishMQTTCommand("FORCE_PUMP");
+      // Call the Voice API with the user's spoken text
+      try {
+        const response = await fetch('/api/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, lang: 'en-US' })
+        });
+
+        const data = await response.json();
+
+        if (data.intent === "actuation" && data.action) {
+          publishMQTTCommand(data.action, data.payload || {});
+
+          // Optional: Speak the response back (Simulating Bhashini TTS)
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(data.aiResponse);
+            window.speechSynthesis.speak(utterance);
+          }
+        }
+      } catch (e) {
+        console.error("Voice API routing failed:", e);
       }
     };
 
@@ -148,18 +187,33 @@ export default function Home() {
   };
 
   // Phase 5: Cloud Vision Upload
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
     setIsUploading(true);
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
 
-    // Simulate Cloud Run API / Firebase ML processing delay
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/vision', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
       setIsUploading(false);
-      // Simulate detection of Early Blight triggering instant Acoustic Levitator actuation
-      publishMQTTCommand("ENABLE_40KHZ_ARRAY");
-      alert("🚨 Cloud AI detected trace elements of Early Blight spores in the image! Instantly transmitting MQTT command to Node Alpha to activate the 40kHz Ultrasonic Phased Array for targeted fungicide delivery.");
-    }, 2500);
+      if (result.action_required && result.action) {
+        publishMQTTCommand(result.action);
+        alert(`🚨 Cloud AI detected ${result.status}! Instantly transmitting MQTT command to Node Alpha to activate the 40kHz Ultrasonic Phased Array for targeted fungicide delivery.`);
+      } else {
+        alert(`Vision Scan Complete: ${result.status || 'Healthy'}`);
+      }
+    } catch (err) {
+      console.error("Vision upload failed:", err);
+      setIsUploading(false);
+    }
   };
 
   // Prevent crashes if DB connection fails
@@ -210,6 +264,86 @@ export default function Home() {
             <p className="text-sm text-zinc-500 font-mono">{new Date(data.timestamp).toLocaleString()}</p>
           </div>
         </header>
+
+        {/* --- PHASE 4: LOCATION & WEATHER INTELLIGENCE --- */}
+        {data.location && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+              className="col-span-1 lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-md overflow-hidden relative h-[350px]"
+            >
+              <div className="absolute top-4 left-4 z-10 bg-black/80 backdrop-blur-md border border-white/10 p-3 rounded-xl flex items-center gap-3">
+                <MapPin className="text-blue-400 w-5 h-5" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Live Node Location</h3>
+                  <p className="text-xs text-zinc-400 font-mono tracking-wider">{data.location.lat.toFixed(4)}, {data.location.lng.toFixed(4)}</p>
+                </div>
+                <div className="ml-4 pl-4 border-l border-white/10 flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs text-zinc-400">{data.location.satellites} Sats</span>
+                </div>
+              </div>
+
+              {/* Leaflet Map Component */}
+              <LocationMap lat={data.location.lat} lng={data.location.lng} nodeId={data.node_id} />
+
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+              className="col-span-1 border border-zinc-800 bg-zinc-900/50 backdrop-blur-md rounded-2xl p-6 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <Map className="text-orange-400 w-5 h-5" /> Regional Context
+                  </h3>
+                  <span className="px-2 py-1 text-xs font-mono bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-md">OpenWeather</span>
+                </div>
+
+                {weatherData ? (
+                  <div className="space-y-4">
+                    <p className="text-3xl font-bold text-white mb-1 capitalize text-center">
+                      {weatherData.description}
+                    </p>
+                    <p className="text-center text-zinc-400 text-sm mb-6">{weatherData.location_name}</p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/5">
+                        <p className="text-xs text-zinc-500 mb-1 leading-none">External Temp</p>
+                        <p className="text-xl font-bold text-orange-400">{weatherData.temp.toFixed(1)}°</p>
+                      </div>
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/5">
+                        <p className="text-xs text-zinc-500 mb-1 leading-none">Wind Speed</p>
+                        <p className="text-xl font-bold text-teal-400">{weatherData.wind_speed.toFixed(1)} m/s</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <span className="text-zinc-500 text-sm animate-pulse">Syncing Orbital Weather...</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/10">
+                <p className="text-xs text-zinc-400 mb-2">Regional ET Adjustment</p>
+                <div className="flex justify-between items-end">
+                  <p className="text-2xl font-black text-indigo-400">
+                    {weatherData ? weatherData.estimated_et_mm.toFixed(2) : '--'} <span className="text-sm font-normal text-indigo-400/60">mm/day</span>
+                  </p>
+                  {weatherData && weatherData.temp > 35 && (
+                    <span className="text-[10px] font-mono text-red-400 bg-red-400/10 px-2 py-1 rounded border border-red-400/20">
+                      DROUGHT STRESS
+                    </span>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {/* Real-time Telemetry Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MetricCard
@@ -349,9 +483,20 @@ export default function Home() {
               <Sprout className="text-blue-400" />
               <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-blue-400">Yield Oracle</span>
             </div>
-            <h3 className="text-zinc-400 text-sm">Projected Crop Yield</h3>
-            <p className="text-3xl font-bold text-blue-400 mt-1">{data.crop_yield?.projected_yield_tha.toFixed(1)} <span className="text-lg text-blue-400/60">t/ha</span></p>
-            <p className="text-sm text-emerald-400 mt-2 font-bold">↑ +{data.crop_yield?.yield_increase_pct.toFixed(1)}% vs. Manual Control</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-zinc-400 text-sm">Projected Yield</h3>
+                <p className="text-3xl font-bold text-blue-400 mt-1">{data.crop_yield?.projected_yield_tha.toFixed(1)} <span className="text-lg text-blue-400/60">t/ha</span></p>
+                <p className="text-sm text-emerald-400 mt-2 font-bold">↑ +{data.crop_yield?.yield_increase_pct.toFixed(1)}%</p>
+              </div>
+
+              <div className="border-l border-white/10 pl-4">
+                <h3 className="text-zinc-400 text-sm">Water Efficiency</h3>
+                <p className="text-3xl font-bold text-cyan-400 mt-1">{data.crop_yield?.water_use_efficiency?.toFixed(1) || 0} <span className="text-lg text-cyan-400/60">kg/m³</span></p>
+                <p className="text-xs text-zinc-500 mt-2 font-mono">WUE Index</p>
+              </div>
+            </div>
           </motion.div >
 
           {/* Anti-Gravity Controls (Magnetic Field & Clinostat) */}

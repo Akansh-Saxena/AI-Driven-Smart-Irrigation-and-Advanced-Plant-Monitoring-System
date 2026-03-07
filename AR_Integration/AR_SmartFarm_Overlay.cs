@@ -15,10 +15,16 @@ public class AR_SmartFarm_Overlay : MonoBehaviour
 {
     // The IP Address of the ESP32 SoftAP Web Server
     public string esp32_api_url = "http://192.168.4.1/api/data";
+    // The IP Address of the ESP32-CAM MJPEG Server
+    public string esp32_cam_url = "http://192.168.4.2:81/";
     
     // UI Elements floating in AR Space
     public TextMeshPro moistureText;
     public TextMeshPro aiForecastText;
+
+    // Phase 4: Video plane to render the texture
+    public Renderer videoPlaneRenderer;
+    private Texture2D camTexture;
 
     // Local configuration
     private float updateInterval = 2.0f; 
@@ -34,8 +40,13 @@ public class AR_SmartFarm_Overlay : MonoBehaviour
 
     void Start()
     {
+        camTexture = new Texture2D(2, 2);
         // Start polling the edge node
         StartCoroutine(FetchTelemetryRoutine());
+        // Start polling ESP32-CAM stream
+        if(videoPlaneRenderer != null) {
+            StartCoroutine(FetchMJPEGRoutine());
+        }
     }
 
     IEnumerator FetchTelemetryRoutine()
@@ -87,6 +98,27 @@ public class AR_SmartFarm_Overlay : MonoBehaviour
             }
             // Wait 2 seconds before polling again
             yield return new WaitForSeconds(updateInterval);
+        }
+    }
+
+    IEnumerator FetchMJPEGRoutine()
+    {
+        // Simple MJPEG fetch by continually requesting a frame (Simulated stream for Unity AR)
+        // Note: For a true boundary-parsing MJPEG stream, a dedicated library/plugin is better.
+        // This acts as a 5fps frame-grabber for demonstration.
+        while (true)
+        {
+            using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(esp32_cam_url))
+            {
+                yield return www.SendWebRequest();
+
+                if (www.result != UnityWebRequest.Result.ConnectionError && www.result != UnityWebRequest.Result.ProtocolError)
+                {
+                    Texture2D tex = DownloadHandlerTexture.GetContent(www);
+                    videoPlaneRenderer.material.mainTexture = tex;
+                }
+            }
+            yield return new WaitForSeconds(0.2f); // 5 FPS
         }
     }
     
