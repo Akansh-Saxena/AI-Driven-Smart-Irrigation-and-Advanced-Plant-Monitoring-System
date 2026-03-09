@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     const newTelemetry = {
       timestamp: new Date().toISOString(),
       node_id: data.node_id || "esp32_unknown",
+      ...(data.location ? { location: data.location } : {}),
       soil_moisture: {
         raw_voltage: data.soil_moisture?.raw_voltage || 0,
         kalman_filtered_v: data.soil_moisture?.kalman_filtered_v || 0,
@@ -92,7 +93,8 @@ export async function POST(request: Request) {
       },
       crop_yield: {
         projected_yield_tha: data.crop_yield?.projected_yield_tha || 14.1,
-        yield_increase_pct: data.crop_yield?.yield_increase_pct || 0.0
+        yield_increase_pct: data.crop_yield?.yield_increase_pct || 0.0,
+        water_use_efficiency: data.crop_yield?.water_use_efficiency || 0.0
       }
     };
 
