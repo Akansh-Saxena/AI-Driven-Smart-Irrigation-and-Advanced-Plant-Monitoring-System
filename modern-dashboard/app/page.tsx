@@ -9,6 +9,7 @@ import mqtt from 'mqtt';
 import LocationMap from "@/components/LocationMap";
 import WeatherAnalytics from "@/components/WeatherAnalytics";
 import ExperimentalControls from "@/components/ExperimentalControls";
+import RegionalContextWidget from "@/components/RegionalContextWidget";
 
 interface TelemetryData {
   timestamp: string;
@@ -294,54 +295,9 @@ export default function Home() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-              className="col-span-1 border border-zinc-800 bg-zinc-900/50 backdrop-blur-md rounded-2xl p-6 flex flex-col justify-between"
+              className="col-span-1 flex h-full w-full"
             >
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold flex items-center gap-2">
-                    <Map className="text-orange-400 w-5 h-5" /> Regional Context
-                  </h3>
-                  <span className="px-2 py-1 text-xs font-mono bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-md">OpenWeather</span>
-                </div>
-
-                {weatherData ? (
-                  <div className="space-y-4">
-                    <p className="text-3xl font-bold text-white mb-1 capitalize text-center">
-                      {weatherData.description}
-                    </p>
-                    <p className="text-center text-zinc-400 text-sm mb-6">{weatherData.location_name}</p>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                        <p className="text-xs text-zinc-500 mb-1 leading-none">External Temp</p>
-                        <p className="text-xl font-bold text-orange-400">{weatherData.temp.toFixed(1)}°</p>
-                      </div>
-                      <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                        <p className="text-xs text-zinc-500 mb-1 leading-none">Wind Speed</p>
-                        <p className="text-xl font-bold text-teal-400">{weatherData.wind_speed.toFixed(1)} m/s</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <span className="text-zinc-500 text-sm animate-pulse">Syncing Orbital Weather...</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-white/10">
-                <p className="text-xs text-zinc-400 mb-2">Regional ET Adjustment</p>
-                <div className="flex justify-between items-end">
-                  <p className="text-2xl font-black text-indigo-400">
-                    {weatherData ? weatherData.estimated_et_mm.toFixed(2) : '--'} <span className="text-sm font-normal text-indigo-400/60">mm/day</span>
-                  </p>
-                  {weatherData && weatherData.temp > 35 && (
-                    <span className="text-[10px] font-mono text-red-400 bg-red-400/10 px-2 py-1 rounded border border-red-400/20">
-                      DROUGHT STRESS
-                    </span>
-                  )}
-                </div>
-              </div>
+              <RegionalContextWidget />
             </motion.div>
           </div>
         )}
