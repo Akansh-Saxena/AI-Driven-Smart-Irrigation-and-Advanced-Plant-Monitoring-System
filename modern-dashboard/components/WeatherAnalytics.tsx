@@ -77,7 +77,7 @@ export default function WeatherAnalytics() {
       filename:     `Agri_Report_${weatherData?.city}_${new Date().getTime()}.pdf`,
       image:        { type: 'jpeg' as const, quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const }
     };
     html2pdf().set(opt).from(element).save();
   };
