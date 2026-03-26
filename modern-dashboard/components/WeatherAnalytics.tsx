@@ -77,6 +77,7 @@ export default function WeatherAnalytics() {
       filename:     `Agri_Report_${weatherData?.city}_${new Date().getTime()}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
+      // Explicitly typed 'as const' to resolve TypeScript mismatches during Render production builds
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const } 
     };
     html2pdf().set(opt).from(element).save();
