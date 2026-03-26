@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import mqtt from 'mqtt';
 import LocationMap from "@/components/LocationMap";
 import WeatherAnalytics from "@/components/WeatherAnalytics";
+import ExperimentalControls from "@/components/ExperimentalControls";
 
 interface TelemetryData {
   timestamp: string;
@@ -500,32 +501,11 @@ export default function Home() {
             </div>
           </motion.div >
 
-          {/* Anti-Gravity Controls (Magnetic Field & Clinostat) */}
+          {/* Experimental Physics Controls (Magnetic Field & Clinostat) */}
           < motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-            className="rounded-2xl p-6 border border-zinc-500/20 bg-zinc-900/80 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
+             className="flex w-full h-full"
           >
-            <div className="flex justify-between items-center mb-4">
-              <Magnet className="text-purple-400" />
-              <span className="text-xs font-mono bg-black/30 px-2 py-1 rounded-full text-zinc-400">Anti-Grav Uplink</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <div>
-                <h3 className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Magnetic Field</h3>
-                <p className="text-lg font-bold text-purple-400">{data.anti_gravity?.magnetic_field_ut.toFixed(0)} <span className="text-sm text-purple-400/60">µT</span></p>
-              </div>
-              <div>
-                <h3 className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Clinostat</h3>
-                <p className="text-lg font-bold text-cyan-400">{data.anti_gravity?.clinostat_rpm.toFixed(1)} <span className="text-sm text-cyan-400/60">RPM</span></p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between bg-black/50 p-3 rounded-xl border border-white/5">
-              <span className="text-sm text-zinc-300 flex items-center gap-2"><Speaker className="w-4 h-4 text-emerald-400" /> 40kHz Array</span>
-              <div className={`w-10 h-5 rounded-full relative cursor-pointer ${data.anti_gravity?.ultrasonic_array_active ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${data.anti_gravity?.ultrasonic_array_active ? 'left-[22px]' : 'left-0.5'}`}></div>
-              </div>
-            </div>
+             <ExperimentalControls data={data.anti_gravity as any} />
           </motion.div >
 
         </div >
