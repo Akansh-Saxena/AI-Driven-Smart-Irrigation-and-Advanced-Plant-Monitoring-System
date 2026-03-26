@@ -7,6 +7,7 @@ import { Droplet, Thermometer, Wind, Activity, BrainCircuit, Droplets, Leaf, Zap
 import { motion } from "framer-motion";
 import mqtt from 'mqtt';
 import LocationMap from "@/components/LocationMap";
+import WeatherAnalytics from "@/components/WeatherAnalytics";
 
 interface TelemetryData {
   timestamp: string;
@@ -718,6 +719,11 @@ export default function Home() {
             </div>
           </div>
         </motion.div >
+
+        {/* Dedicated Enterprise Weather Analytics Panel */}
+        <div className="mb-12">
+           <WeatherAnalytics />
+        </div>
 
         {/* Database Historical Chart */}
         < HistoricalChart data={history} />
