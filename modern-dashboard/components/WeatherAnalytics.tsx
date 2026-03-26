@@ -72,12 +72,12 @@ export default function WeatherAnalytics() {
     const element = document.getElementById('analytics-report-area');
     if (!element) return;
     
-    const opt = {
+    const opt: any = {
       margin:       0.5,
       filename:     `Agri_Report_${weatherData?.city}_${new Date().getTime()}.pdf`,
-      image:        { type: 'jpeg' as const, quality: 0.98 },
+      image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const }
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const } 
     };
     html2pdf().set(opt).from(element).save();
   };
