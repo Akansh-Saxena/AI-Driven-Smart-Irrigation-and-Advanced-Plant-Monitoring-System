@@ -55,7 +55,7 @@ const char* ssid = "Danger";
 const char* password = "sairamSR@4555";
 
 // Your live Render API URL
-const char* serverName = "https://ai-driven-smart-irrigation-and-advanced.onrender.com/api/telemetry";
+const char* serverName = "https://ai-driven-smart-irrigation-and-advanced.onrender.com/api/v1/telemetry/nodes";
 
 const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
@@ -260,7 +260,7 @@ void loop() {
     http.addHeader("Content-Type", "application/json");
     int httpResponseCode = http.POST(payload);
     
-    // Process Response from Cloud (e.g. Manual Pump Override)
+    // Process Response from Cloud (e.g. Manual Pump Override & Live Environmental Sync)
     if (httpResponseCode > 0) {
       Serial.print("HTTP POST Success: ");
       Serial.println(httpResponseCode);
@@ -273,6 +273,47 @@ void loop() {
         digitalWrite(RELAY_PIN, HIGH);
         awakeStartTime = millis(); // Stay awake to pump water
       }
+      
+      // Parse Live Environmental Sync from JSON
+      int idxTemp = response.indexOf("\"temperature_c\":");
+      int idxHum = response.indexOf("\"humidity_pct\":");
+      int idxRain = response.indexOf("\"rain_expected_24h\":");
+      
+      float envTemp = 0;
+      float envHum = 0;
+      bool envRain = false;
+      
+      if (idxTemp > 0) {
+         int endIdx = response.indexOf(",", idxTemp);
+         envTemp = response.substring(idxTemp + 16, endIdx).toFloat();
+      }
+      if (idxHum > 0) {
+         int endIdx = response.indexOf(",", idxHum);
+         envHum = response.substring(idxHum + 15, endIdx).toFloat();
+      }
+      if (idxRain > 0) {
+         // Look for "true" inside the "rain_expected_24h" boolean
+         envRain = (response.indexOf("true", idxRain) > 0 && response.indexOf("true", idxRain) < idxRain + 25);
+      }
+      
+      Serial.print("Live Atmosphere Sync - Temp: ");
+      Serial.print(envTemp);
+      Serial.print("C, Hum: ");
+      Serial.print(envHum);
+      Serial.print("%, Rain Expected: ");
+      Serial.println(envRain ? "YES" : "NO");
+
+      // Futuristic AI Logic integration: 
+      // If rain is expected, delay pump activation unless extremely dry
+      if (envRain && x_est < 3.0 && !isPumpActive) {
+          Serial.println("Edge AI Decision: Rain expected in 24h. Inhibiting pump to conserve water.");
+      } else if (x_est > 2.0 && envTemp > 35.0 && envHum < 30.0 && !isPumpActive) {
+          Serial.println("Edge AI Decision: Extreme heat and dry atmosphere detected. Activating pump early to prevent wilting!");
+          isPumpActive = true;
+          digitalWrite(RELAY_PIN, HIGH);
+          awakeStartTime = millis();
+      }
+      
     } else {
       Serial.print("Error sending POST: ");
       Serial.println(httpResponseCode);
